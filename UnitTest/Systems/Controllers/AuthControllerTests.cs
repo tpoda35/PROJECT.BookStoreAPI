@@ -1,13 +1,16 @@
 ﻿using BookStoreAPI.Controllers;
 using BookStoreAPI.Dtos;
+using BookStoreAPI.Models;
 using BookStoreAPI.Repositories;
 using BookStoreAPI.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using UnitTest.Fixtures;
@@ -37,6 +40,21 @@ namespace UnitTest.Systems.Controllers
             _loginData = LoginFixtures.GetLoginData();
         }
 
+        private void SetupHttpContext(string username)
+        {
+            var principal = RefreshFixtures.GetPrincipal();
+
+            var httpContext = new DefaultHttpContext
+            {
+                User = principal
+            };
+
+            _controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = httpContext
+            };
+        }
+
         //Login
         [Fact]
         public async Task Login_WithValidCredentials_ReturnsOkObjectResult()
@@ -64,6 +82,12 @@ namespace UnitTest.Systems.Controllers
             var actualResponse = Assert.IsType<LoginResponseDto>(okResult.Value);
 
             Assert.NotNull(actualResponse);
+
+            _mockAuthService.Verify(a => a.LoginUser(_loginData), Times.Once);
+            _mockRoleService.Verify(r => r.GetUserRoleAsync(_loginData.Email), Times.Once);
+            _mockAuthService.Verify(a => a.GenerateJwtToken(_loginData.Email, role), Times.Once);
+            _mockAuthService.Verify(a => a.CheckRefreshToken(_loginData.Email), Times.Once);
+            _mockAuthService.Verify(a => a.GetAuthDataFromUser(_loginData.Email, accessToken), Times.Once);
         }
 
         [Fact]
@@ -77,6 +101,8 @@ namespace UnitTest.Systems.Controllers
 
             //Assert
             Assert.IsType<BadRequestResult>(result);
+
+            _mockAuthService.Verify(a => a.LoginUser(_loginData), Times.Once);
         }
 
         [Fact]
@@ -92,6 +118,9 @@ namespace UnitTest.Systems.Controllers
 
             //Assert
             Assert.IsType<NotFoundObjectResult>(result);
+
+            _mockAuthService.Verify(a => a.LoginUser(_loginData), Times.Once);
+            _mockRoleService.Verify(r => r.GetUserRoleAsync(_loginData.Email), Times.Once);
         }
 
         [Fact]
@@ -123,6 +152,13 @@ namespace UnitTest.Systems.Controllers
             var actualResponse = Assert.IsType<LoginResponseDto>(okResult.Value);
 
             Assert.NotNull(actualResponse);
+
+            _mockAuthService.Verify(a => a.LoginUser(_loginData), Times.Once);
+            _mockRoleService.Verify(r => r.GetUserRoleAsync(_loginData.Email), Times.Once);
+            _mockAuthService.Verify(a => a.GenerateJwtToken(_loginData.Email, role), Times.Once);
+            _mockAuthService.Verify(a => a.CheckRefreshToken(_loginData.Email), Times.Once);
+            _mockAuthService.Verify(a => a.AddTokenToUser(_loginData.Email, It.IsAny<string>()), Times.Once);
+            _mockAuthService.Verify(a => a.GetAuthDataFromUser(_loginData.Email, accessToken), Times.Once);
         }
 
         [Fact]
@@ -149,6 +185,12 @@ namespace UnitTest.Systems.Controllers
             //Assert
             var BadRequestResult = Assert.IsType<BadRequestObjectResult>(result);
             var actualResponse = Assert.IsType<string>(BadRequestResult.Value);
+
+            _mockAuthService.Verify(a => a.LoginUser(_loginData), Times.Once);
+            _mockRoleService.Verify(r => r.GetUserRoleAsync(_loginData.Email), Times.Once);
+            _mockAuthService.Verify(a => a.GenerateJwtToken(_loginData.Email, role), Times.Once);
+            _mockAuthService.Verify(a => a.CheckRefreshToken(_loginData.Email), Times.Once);
+            _mockAuthService.Verify(a => a.AddTokenToUser(_loginData.Email, It.IsAny<string>()), Times.Once);
         }
 
         //Register
@@ -165,6 +207,8 @@ namespace UnitTest.Systems.Controllers
 
             //Assert
             Assert.IsType<OkObjectResult>(result);
+
+            _mockAuthService.Verify(a => a.RegisterUser(registerData), Times.Once);
         }
 
         [Fact]
@@ -180,6 +224,8 @@ namespace UnitTest.Systems.Controllers
 
             //Assert
             Assert.IsType<BadRequestResult>(result);
+
+            _mockAuthService.Verify(a => a.RegisterUser(registerData), Times.Once);
         }
 
         //Refresh
@@ -187,10 +233,175 @@ namespace UnitTest.Systems.Controllers
         public async Task Refresh_WithValidCredentials_ReturnsOkObjectResult()
         {
             //Arrange
+            var principal = RefreshFixtures.GetPrincipal();
+            var refreshModel = RefreshFixtures.GetRefreshModel();
+            var appUser = RefreshFixtures.GetAppUser();
+            var role = "role";
+            var accessTokenDto = LoginFixtures.GetAccessTokenDto();
 
+            _mockAuthService.Setup(a => a.GetClaimsPrincipal(refreshModel.AccessToken))
+                .Returns(principal);
+            _mockAuthService.Setup(a => a.GetUser(It.IsAny<string>()))
+                .ReturnsAsync(appUser);
+            _mockRoleService.Setup(r => r.GetUserRoleAsync(It.IsAny<string>()))
+                .ReturnsAsync(role);
+            _mockAuthService.Setup(a => a.GenerateJwtToken(It.IsAny<string>(), role))
+                .Returns(accessTokenDto);
             //Act
+            var result = await _controller.Refresh(refreshModel);
 
             //Assert
+            var okResult = Assert.IsType<OkObjectResult>(result);
+            var actualResponse = Assert.IsType<LoginResponseDto>(okResult.Value);
+
+            Assert.NotNull(actualResponse);
+
+            _mockAuthService.Verify(a => a.GetClaimsPrincipal(refreshModel.AccessToken), Times.Once);
+            _mockAuthService.Verify(a => a.GetUser(It.IsAny<string>()), Times.Once);
+            _mockRoleService.Verify(r => r.GetUserRoleAsync(It.IsAny<string>()), Times.Once);
+            _mockAuthService.Verify(a => a.GenerateJwtToken(It.IsAny<string>(), role), Times.Once);
+        }
+
+        [Fact]
+        public async Task Refresh_WithInvalidPrincipals_ReturnsUnauthorizedResult()
+        {
+            //Arrange
+            var invalidPrincipals = new ClaimsPrincipal();
+            var refreshModel = RefreshFixtures.GetRefreshModel();
+
+            _mockAuthService.Setup(a => a.GetClaimsPrincipal(refreshModel.AccessToken))
+                .Returns(invalidPrincipals);
+            //Act
+            var result = await _controller.Refresh(refreshModel);
+
+            //Assert
+            Assert.IsType<UnauthorizedResult>(result);
+
+            _mockAuthService.Verify(a => a.GetClaimsPrincipal(refreshModel.AccessToken), Times.Once);
+        }
+
+        [Fact]
+        public async Task Refresh_WithUserIsNull_ReturnsUnauthorizedResult()
+        {
+            //Arrange
+            var principal = RefreshFixtures.GetPrincipal();
+            var refreshModel = RefreshFixtures.GetRefreshModel();
+            AppUser? user = null;
+
+            _mockAuthService.Setup(a => a.GetClaimsPrincipal(refreshModel.AccessToken))
+                .Returns(principal);
+            _mockAuthService.Setup(a => a.GetUser(It.IsAny<string>()))
+                .ReturnsAsync(user);
+            //Act
+            var result = await _controller.Refresh(refreshModel);
+
+            //Assert
+            Assert.IsType<UnauthorizedResult>(result);
+
+            _mockAuthService.Verify(a => a.GetClaimsPrincipal(refreshModel.AccessToken), Times.Once);
+            _mockAuthService.Verify(a => a.GetUser(It.IsAny<string>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task Refresh_WithRoleNotFound_ReturnsNotFoundObjectResult()
+        {
+            //Arrange
+            var principal = RefreshFixtures.GetPrincipal();
+            var refreshModel = RefreshFixtures.GetRefreshModel();
+            var appUser = RefreshFixtures.GetAppUser();
+            string? role = null;
+
+            _mockAuthService.Setup(a => a.GetClaimsPrincipal(refreshModel.AccessToken))
+                .Returns(principal);
+            _mockAuthService.Setup(a => a.GetUser(It.IsAny<string>()))
+                .ReturnsAsync(appUser);
+            _mockRoleService.Setup(r => r.GetUserRoleAsync(It.IsAny<string>()))
+                .ReturnsAsync(role);
+            //Act
+            var result = await _controller.Refresh(refreshModel);
+
+            //Assert
+            Assert.IsType<NotFoundObjectResult>(result);
+
+            _mockAuthService.Verify(a => a.GetClaimsPrincipal(refreshModel.AccessToken), Times.Once);
+            _mockAuthService.Verify(a => a.GetUser(It.IsAny<string>()), Times.Once);
+            _mockRoleService.Verify(r => r.GetUserRoleAsync(It.IsAny<string>()), Times.Once);
+        }
+
+        //Revoke
+        [Fact]
+        public async Task Revoke_WithValidCredentials_ReturnOkResult()
+        {
+            //Arrange
+            string username = "testname";
+            SetupHttpContext(username);
+            var appUser = RefreshFixtures.GetAppUser();
+
+            _mockAuthService.Setup(a => a.GetUser(It.IsAny<string>()))
+                .ReturnsAsync(appUser);
+            _mockAuthRepository.Setup(a => a.RevokeToken(appUser))
+                .ReturnsAsync(true);
+            //Act
+            var result = await _controller.Revoke();
+
+            //Assert
+            Assert.IsType<OkResult>(result);
+
+            _mockAuthService.Verify(a => a.GetUser(It.IsAny<string>()), Times.Once);
+            _mockAuthRepository.Verify(a => a.RevokeToken(appUser), Times.Once);
+        }
+
+        [Fact]
+        public async Task Revoke_WithUsernameNull_ReturnsUnauthorizedResult()
+        {
+            //Arrange
+            string? username = null;
+            SetupHttpContext(username);
+
+            //Act
+            var result = await _controller.Revoke();
+
+            //Assert
+            Assert.IsType<UnauthorizedResult>(result);
+        }
+
+        [Fact]
+        public async Task Revoke_WithUserIsNull_ReturnsUnauthorizedResult()
+        {
+            string username = "testname";
+            SetupHttpContext(username);
+            AppUser? appUser = null;
+
+            _mockAuthService.Setup(a => a.GetUser(It.IsAny<string>()))
+                .ReturnsAsync(appUser);
+            //Act
+            var result = await _controller.Revoke();
+
+            //Assert
+            Assert.IsType<UnauthorizedResult>(result);
+
+            _mockAuthService.Verify(a => a.GetUser(It.IsAny<string>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task Revoke_WithFailedRevokeToken_ReturnsBadRequestObjectResult()
+        {
+            string username = "testname";
+            SetupHttpContext(username);
+            var appUser = RefreshFixtures.GetAppUser();
+
+            _mockAuthService.Setup(a => a.GetUser(It.IsAny<string>()))
+                .ReturnsAsync(appUser);
+            _mockAuthRepository.Setup(a => a.RevokeToken(appUser))
+                .ReturnsAsync(false);
+            //Act
+            var result = await _controller.Revoke();
+
+            //Assert
+            Assert.IsType<BadRequestObjectResult>(result);
+
+            _mockAuthService.Verify(a => a.GetUser(It.IsAny<string>()), Times.Once);
+            _mockAuthRepository.Verify(a => a.RevokeToken(appUser), Times.Once);
         }
     }
 }
