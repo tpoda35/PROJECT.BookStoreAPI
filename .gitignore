@@ -485,5 +485,6 @@ $RECYCLE.BIN/
 
 #Appsettings:
 BookStoreAPI/appsettings.json
-BookStoreAPI/appsettings.Development.json
 BookStoreAPI/Properties
+/BookStoreAPI/appsettings.Development.json
+/BookStoreAPI/appsettings.Development.json
