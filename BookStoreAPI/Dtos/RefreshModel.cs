@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace BookStoreAPI.Models
+namespace BookStoreAPI.Dtos
 {
     public class RefreshModel
     {

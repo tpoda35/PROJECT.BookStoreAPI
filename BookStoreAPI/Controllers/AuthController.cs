@@ -1,7 +1,6 @@
 ﻿using Azure.Core;
 using BookStoreAPI.Dtos;
 using BookStoreAPI.Helpers;
-using BookStoreAPI.Models;
 using BookStoreAPI.Repositories;
 using BookStoreAPI.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -90,7 +89,7 @@ namespace BookStoreAPI.Controllers
         }
 
         [Authorize]
-        [HttpDelete]
+        [HttpDelete("Revoke")]
         public async Task<IActionResult> Revoke()
         {
             var username = HttpContext.User.Identity?.Name;

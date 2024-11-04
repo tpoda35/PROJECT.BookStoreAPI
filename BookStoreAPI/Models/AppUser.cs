@@ -6,5 +6,7 @@ namespace BookStoreAPI.Models
     {
         public string? RefreshToken { get; set; }
         public DateTime RefreshTokenExpiry { get; set; }
+
+        public ICollection<AppUserBook> AppUserBooks { get; set; } = new List<AppUserBook>();
     }
 }

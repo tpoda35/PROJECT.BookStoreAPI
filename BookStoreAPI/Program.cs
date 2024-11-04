@@ -56,12 +56,22 @@ builder.Services.AddAuthorization(options =>
         policy.RequireClaim(ClaimTypes.Role, "Admin"));
 });
 
+//Book
+builder.Services.AddScoped<IBookService, BookService>();
+builder.Services.AddScoped<IBookRepository, BookRepository>();
+builder.Services.AddSingleton<IBookCacheManager, BookCacheManager>();
+
+
 //Roles
 builder.Services.AddScoped<IRoleService, RoleService>();
 
 //Authentication
 builder.Services.AddTransient<IAuthService, AuthService>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+
+builder.Services.AddMemoryCache();
+
+builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -106,6 +116,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+//app.UseMiddleware<ApiKeyAuthMiddleware>();
 
 app.UseAuthentication();
 
