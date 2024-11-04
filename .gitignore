@@ -245,6 +245,7 @@ ClientBin/
 *.pfx
 *.publishsettings
 orleans.codegen.cs
+/Migrations
 
 # Including strong name files can present a security risk
 # (https://github.com/github/gitignore/pull/2483#issue-259490424)
@@ -488,3 +489,8 @@ BookStoreAPI/appsettings.json
 BookStoreAPI/Properties
 /BookStoreAPI/appsettings.Development.json
 /BookStoreAPI/appsettings.Development.json
+/BookStoreAPI/Migrations/ApplicationDbContextModelSnapshot.cs
+/BookStoreAPI/Migrations/20241101102156_InitialMigration.cs
+/BookStoreAPI/Migrations/20241101161911_RefreshTokenMigration.cs
+/BookStoreAPI/Migrations/20241102231506_BookSystem.cs
+/BookStoreAPI/Migrations/20241102231506_BookSystem.Designer.cs
