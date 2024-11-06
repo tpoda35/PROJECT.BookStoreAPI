@@ -5,6 +5,7 @@ using BookStoreAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace BookStoreAPI.Controllers
 {
@@ -72,6 +73,32 @@ namespace BookStoreAPI.Controllers
             if (result is false) return BadRequest("Something went wrong.");
 
             return NoContent();
+        }
+
+        [Authorize]
+        [HttpPost("RentBook/{Id}")]
+        public async Task<IActionResult> RentBook(int Id)
+        {
+            var userMail = User.FindFirst(ClaimTypes.Email)?.Value;
+            if (userMail is null) return BadRequest();
+
+            var result = await _bookService.RentBook(Id, userMail);
+            if (result.IsSuccess is false) return BadRequest(result.result);
+
+            return CreatedAtAction(nameof(RentBook), new {id = Id});
+        }
+
+        [Authorize]
+        [HttpDelete("CancelRent/{Id}")]
+        public async Task<IActionResult> CancelRent(int Id)
+        {
+            var userMail = User.FindFirst(ClaimTypes.Email)?.Value;
+            if (userMail is null) return BadRequest();
+
+            var result = await _bookService.CancelRent(Id, userMail);
+            if (result) return NoContent();
+
+            return BadRequest();
         }
     }
 }

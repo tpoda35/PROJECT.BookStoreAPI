@@ -19,6 +19,9 @@ namespace BookStoreAPI.Repositories
         Task<(bool IsSuccess, Book Book)> AddBook(Book book);
         Task<bool> DeleteBook(int id);
         Task<bool> UpdateBook(int Id, BookDto bookDto);
+        Task<bool> CanRent(string userId);
+        Task<bool> RentBook(string userId, int bookId);
+        Task<bool> CancelRent(int bookId, string userId);
     }
 
     public class BookRepository : IBookRepository
@@ -134,6 +137,37 @@ namespace BookStoreAPI.Repositories
             if (book.Description != bookDto.Description) book.Description = bookDto.Description;
             if (book.Pages != bookDto.Pages) book.Pages = bookDto.Pages;
 
+            return await _context.SaveChangesAsync() > 0;
+        }
+
+        public async Task<bool> CanRent(string userId)
+        {
+            var bookCount = await _context.AppUserBooks
+                .Where(ub => ub.UserId == userId)
+                .CountAsync();
+
+            return bookCount < 5;
+        }
+
+        public async Task<bool> RentBook(string userId, int bookId)
+        {
+            var rent = new AppUserBook
+            {
+                UserId = userId,
+                BookId = bookId
+            };
+
+            _context.AppUserBooks.Add(rent);
+            return await _context.SaveChangesAsync() > 0;
+        }
+
+        public async Task<bool> CancelRent(int bookId, string userId)
+        {
+            var appUserBook = await _context.AppUserBooks
+                .FirstOrDefaultAsync(ab => ab.UserId == userId && ab.BookId == bookId);
+            if (appUserBook is null) return false;
+
+            _context.AppUserBooks.Remove(appUserBook);
             return await _context.SaveChangesAsync() > 0;
         }
     }
